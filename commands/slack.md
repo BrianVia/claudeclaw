@@ -16,12 +16,10 @@ Show the Slack bot integration status. Check the following:
 
 4. **Running**: Check if the daemon is running by reading `.claude/claudeclaw/daemon.pid`. The Slack bot runs in-process with the daemon when both tokens are configured.
 
-5. **Setup guide** (if tokens not configured): Explain how to set up a Slack app:
-   - Go to https://api.slack.com/apps → Create New App → From scratch
-   - Enable Socket Mode (Settings → Socket Mode → Enable)
-   - Create an App-Level Token with `connections:write` scope → save as `slack.appToken`
-   - Add Bot Token Scopes (OAuth & Permissions): `app_mentions:read`, `channels:history`, `channels:read`, `chat:write`, `files:read`, `groups:history`, `groups:read`, `im:history`, `im:read`, `im:write`, `reactions:read`, `reactions:write`, `users:read`
-   - Enable Events (Event Subscriptions → Enable → Subscribe to bot events): `app_mention`, `message.channels`, `message.groups`, `message.im`
+5. **Setup guide** (if tokens not configured): Point the user to `docs/slack-manifest.yml` which contains a ready-to-use Slack app manifest. Quick setup:
+   - Go to https://api.slack.com/apps?new_app=1 → "From a manifest" → pick workspace
+   - Paste the contents of `docs/slack-manifest.yml`
+   - After creation: generate an App-Level Token with `connections:write` scope → save as `slack.appToken`
    - Install to workspace → copy Bot User OAuth Token → save as `slack.botToken`
    - Optionally add `slack.allowedUserIds` and `slack.listenChannels`
 
