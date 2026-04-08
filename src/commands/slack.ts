@@ -5,7 +5,7 @@ import { transcribeAudioToText } from "../whisper";
 import { resolveSkillPrompt } from "../skills";
 import { mkdir } from "node:fs/promises";
 import { extname, join } from "node:path";
-import { INBOX_DIR } from "../paths";
+import { INBOX_DIR, UPDATE_STATUS_FILE } from "../paths";
 
 // --- Slack API constants ---
 
@@ -130,8 +130,13 @@ async function resolveUserName(token: string, userId: string): Promise<string> {
   if (cached) return cached;
 
   try {
-    const info = await slackApi<{ user: SlackUser }>(token, "users.info", { user: userId });
-    const name = info.user.real_name || info.user.name || userId;
+    // users.info requires user as a query param, not JSON body
+    const res = await fetch(`${SLACK_API}/users.info?user=${userId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = (await res.json()) as { ok: boolean; user?: SlackUser; error?: string };
+    if (!data.ok || !data.user) throw new Error(data.error ?? "no user");
+    const name = data.user.real_name || data.user.name || userId;
     userNameCache.set(userId, name);
     return name;
   } catch (err) {
@@ -354,6 +359,67 @@ async function handleSlashCommand(
       `Created: ${session.createdAt}`,
     ];
     await respondToSlashCommand(command.response_url, lines.join("\n"));
+    return;
+  }
+
+  if (cmdName === "update") {
+    const cwd = process.cwd();
+
+    // Check for uncommitted changes
+    const gitStatus = Bun.spawnSync(["git", "status", "--porcelain"], { cwd });
+    if (gitStatus.stdout.toString().trim()) {
+      await respondToSlashCommand(command.response_url, "Cannot update: working directory has uncommitted changes.");
+      return;
+    }
+
+    // Fetch latest from remote
+    const fetchResult = Bun.spawnSync(["git", "fetch", "--quiet"], { cwd });
+    if (fetchResult.exitCode !== 0) {
+      await respondToSlashCommand(command.response_url, "Cannot update: git fetch failed.");
+      return;
+    }
+
+    // Check if there are commits to pull
+    const behind = Bun.spawnSync(["git", "rev-list", "--count", "HEAD..@{u}"], { cwd })
+      .stdout.toString().trim();
+    if (behind === "0") {
+      await respondToSlashCommand(command.response_url, "Already up to date.");
+      return;
+    }
+
+    // Get current commit
+    const currentCommit = Bun.spawnSync(["git", "rev-parse", "HEAD"], { cwd })
+      .stdout.toString().trim();
+
+    // Write update status file
+    const { getDaemonStartArgs } = await import("./start");
+    const statusData = {
+      requestedAt: Date.now(),
+      requestedBy: command.user_id,
+      channelId: command.channel_id,
+      responseUrl: command.response_url,
+      previousCommit: currentCommit,
+      status: "pending",
+      startArgs: getDaemonStartArgs(),
+    };
+    const { writeFile } = await import("fs/promises");
+    await writeFile(UPDATE_STATUS_FILE, JSON.stringify(statusData, null, 2));
+
+    await respondToSlashCommand(
+      command.response_url,
+      `Updating... (${behind} commit${behind === "1" ? "" : "s"} behind)`
+    );
+
+    // Spawn detached updater
+    const updaterScript = join(import.meta.dir, "..", "updater.ts");
+    const proc = Bun.spawn([process.execPath, "run", updaterScript], {
+      cwd,
+      stdin: "ignore",
+      stdout: "ignore",
+      stderr: "ignore",
+      env: { ...process.env },
+    });
+    proc.unref();
     return;
   }
 

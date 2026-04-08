@@ -1,4 +1,4 @@
-import { writeFile, unlink, mkdir } from "fs/promises";
+import { readFile, writeFile, unlink, mkdir } from "fs/promises";
 import { join } from "path";
 import { fileURLToPath } from "url";
 import { run, runUserMessage, streamUserMessage, bootstrap, ensureProjectClaudeMd, loadHeartbeatPromptTemplate } from "../runner";
@@ -11,7 +11,7 @@ import { getDayAndMinuteAtOffset } from "../timezone";
 import { startWebUi, type WebServerHandle } from "../web";
 import type { Job } from "../jobs";
 
-import { DATA_DIR } from "../paths";
+import { DATA_DIR, UPDATE_STATUS_FILE } from "../paths";
 
 const CLAUDE_DIR = join(process.cwd(), ".claude");
 const STATUSLINE_FILE = join(CLAUDE_DIR, "statusline.cjs");
@@ -199,9 +199,19 @@ async function teardownStatusline() {
   }
 }
 
+// --- Self-update support ---
+
+let daemonStartArgs: string[] = [];
+
+/** Returns the raw CLI args passed to `start()`, used by the updater to restart with the same flags. */
+export function getDaemonStartArgs(): string[] {
+  return daemonStartArgs;
+}
+
 // --- Main ---
 
 export async function start(args: string[] = []) {
+  daemonStartArgs = args;
   let hasPromptFlag = false;
   let hasTriggerFlag = false;
   let telegramFlag = false;
@@ -434,6 +444,47 @@ export async function start(args: string[] = []) {
 
   await initSlack(currentSettings.slack.botToken, currentSettings.slack.appToken);
   if (!slackBotToken) console.log("  Slack: not configured");
+
+  // Report self-update result if we just restarted after an update.
+  if (slackBotToken) {
+    try {
+      const raw = await readFile(UPDATE_STATUS_FILE, "utf-8");
+      const status = JSON.parse(raw);
+      if (status.status === "restarting" && status.channelId) {
+        const shortOld = status.previousCommit?.slice(0, 7) ?? "???";
+        const shortNew = status.newCommit?.slice(0, 7) ?? "???";
+        const duration = Math.round((Date.now() - status.requestedAt) / 1000);
+        await fetch("https://slack.com/api/chat.postMessage", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${slackBotToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            channel: status.channelId,
+            text: `Update complete: \`${shortOld}\` → \`${shortNew}\` (${duration}s)`,
+          }),
+        });
+        await unlink(UPDATE_STATUS_FILE).catch(() => {});
+        console.log(`[${ts()}] Self-update complete: ${shortOld} → ${shortNew}`);
+      } else if (status.status === "failed" && status.channelId) {
+        await fetch("https://slack.com/api/chat.postMessage", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${slackBotToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            channel: status.channelId,
+            text: `Update failed: ${status.error ?? "unknown error"}`,
+          }),
+        });
+        await unlink(UPDATE_STATUS_FILE).catch(() => {});
+      }
+    } catch {
+      // No status file or invalid — nothing to report.
+    }
+  }
 
   function isAddrInUse(err: unknown): boolean {
     if (!err || typeof err !== "object") return false;
