@@ -253,21 +253,28 @@ function buildSecurityArgs(security: SecurityConfig): string[] {
   return args;
 }
 
-/** Load and concatenate all prompt files from the prompts/ directory. */
+/**
+ * Load and concatenate all prompt files.
+ * User overrides in ~/.claudeclaw/prompts/ take precedence over repo defaults.
+ */
 async function loadPrompts(): Promise<string> {
-  const selectedPromptFiles = [
-    join(PROMPTS_DIR, "IDENTITY.md"),
-    join(PROMPTS_DIR, "USER.md"),
-    join(PROMPTS_DIR, "SOUL.md"),
-  ];
+  const promptNames = ["IDENTITY.md", "USER.md", "SOUL.md"];
   const parts: string[] = [];
 
-  for (const file of selectedPromptFiles) {
-    try {
-      const content = await Bun.file(file).text();
-      if (content.trim()) parts.push(content.trim());
-    } catch (e) {
-      console.error(`[${new Date().toLocaleTimeString()}] Failed to read prompt file ${file}:`, e);
+  for (const name of promptNames) {
+    // Prefer user override, fall back to repo default
+    const userFile = join(PROJECT_PROMPTS_DIR, name);
+    const repoFile = join(PROMPTS_DIR, name);
+    for (const file of [userFile, repoFile]) {
+      try {
+        const content = await Bun.file(file).text();
+        if (content.trim()) {
+          parts.push(content.trim());
+          break; // use first found
+        }
+      } catch {
+        // try next
+      }
     }
   }
 
