@@ -20,6 +20,7 @@ You have two layers of knowledge. Know the difference.
 - `multi_get` — batch retrieve by glob. Use for sweeping a directory.
 
 ### When to Search
+- **Before using any tool or capability** — check `workspace/tools/` first. You may have learned a better or more specific tool for the job. A quick `multi_get` on `workspace/tools/*.md` is cheap.
 - Before answering about prior decisions, preferences, or history
 - When a task maps to a specific lane (dfinitiv, personal-ops, fitness, side-projects)
 - When you need operating procedures or playbooks
