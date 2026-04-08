@@ -5,6 +5,7 @@ import { transcribeAudioToText } from "../whisper";
 import { resolveSkillPrompt } from "../skills";
 import { mkdir } from "node:fs/promises";
 import { extname, join } from "node:path";
+import { INBOX_DIR } from "../paths";
 
 // --- Slack API constants ---
 
@@ -290,7 +291,7 @@ async function downloadSlackFile(
   const url = file.url_private_download || file.url_private;
   if (!url) return null;
 
-  const dir = join(process.cwd(), ".claude", "claudeclaw", "inbox", "slack");
+  const dir = join(INBOX_DIR, "slack");
   await mkdir(dir, { recursive: true });
 
   const response = await fetch(url, {
@@ -778,11 +779,11 @@ export async function slack() {
   const config = getSettings().slack;
 
   if (!config.botToken) {
-    console.error("Slack bot token not configured. Set slack.botToken in .claude/claudeclaw/settings.json");
+    console.error("Slack bot token not configured. Set slack.botToken in ~/.claudeclaw/settings.json");
     process.exit(1);
   }
   if (!config.appToken) {
-    console.error("Slack app token not configured. Set slack.appToken in .claude/claudeclaw/settings.json");
+    console.error("Slack app token not configured. Set slack.appToken in ~/.claudeclaw/settings.json");
     process.exit(1);
   }
 

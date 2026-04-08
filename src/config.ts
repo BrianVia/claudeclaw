@@ -1,12 +1,8 @@
-import { join, isAbsolute } from "path";
+import { isAbsolute, join } from "path";
 import { mkdir } from "fs/promises";
 import { existsSync } from "fs";
 import { normalizeTimezoneName, resolveTimezoneOffsetMinutes } from "./timezone";
-
-const HEARTBEAT_DIR = join(process.cwd(), ".claude", "claudeclaw");
-const SETTINGS_FILE = join(HEARTBEAT_DIR, "settings.json");
-const JOBS_DIR = join(HEARTBEAT_DIR, "jobs");
-const LOGS_DIR = join(HEARTBEAT_DIR, "logs");
+import { DATA_DIR, SETTINGS_FILE, JOBS_DIR, LOGS_DIR } from "./paths";
 
 const DEFAULT_SETTINGS: Settings = {
   model: "",
@@ -160,7 +156,7 @@ export interface SttConfig {
 let cached: Settings | null = null;
 
 export async function initConfig(): Promise<void> {
-  await mkdir(HEARTBEAT_DIR, { recursive: true });
+  await mkdir(DATA_DIR, { recursive: true });
   await mkdir(JOBS_DIR, { recursive: true });
   await mkdir(LOGS_DIR, { recursive: true });
 

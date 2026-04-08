@@ -12,12 +12,13 @@ import { getSettings, type ModelConfig, type SecurityConfig } from "./config";
 import { buildClockPromptPrefix } from "./timezone";
 import { selectModel } from "./model-router";
 
-const LOGS_DIR = join(process.cwd(), ".claude/claudeclaw/logs");
-// Resolve prompts relative to the claudeclaw installation, not the project dir
+import { LOGS_DIR, USER_PROMPTS_DIR } from "./paths";
+
+// Resolve prompts relative to the claudeclaw installation, not the data dir
 const PROMPTS_DIR = join(import.meta.dir, "..", "prompts");
 const HEARTBEAT_PROMPT_FILE = join(PROMPTS_DIR, "heartbeat", "HEARTBEAT.md");
-// Project-level prompt overrides live here (gitignored, user-owned)
-const PROJECT_PROMPTS_DIR = join(process.cwd(), ".claude", "claudeclaw", "prompts");
+// User-level prompt overrides live in ~/.claudeclaw/prompts/
+const PROJECT_PROMPTS_DIR = USER_PROMPTS_DIR;
 const PROJECT_CLAUDE_MD = join(process.cwd(), "CLAUDE.md");
 const LEGACY_PROJECT_CLAUDE_MD = join(process.cwd(), ".claude", "CLAUDE.md");
 const CLAUDECLAW_BLOCK_START = "<!-- claudeclaw:managed:start -->";
@@ -276,7 +277,7 @@ async function loadPrompts(): Promise<string> {
 /**
  * Load the heartbeat prompt template.
  * Project-level override takes precedence: place a file at
- * .claude/claudeclaw/prompts/HEARTBEAT.md to fully replace the built-in template.
+ * ~/.claudeclaw/prompts/HEARTBEAT.md to fully replace the built-in template.
  */
 export async function loadHeartbeatPromptTemplate(): Promise<string> {
   const projectOverride = join(PROJECT_PROMPTS_DIR, "HEARTBEAT.md");

@@ -1,13 +1,6 @@
 import { join } from "path";
 import { readdir, readFile } from "fs/promises";
-import { homedir } from "os";
-
-const CLAUDE_DIR = join(process.cwd(), ".claude");
-const HEARTBEAT_DIR = join(CLAUDE_DIR, "claudeclaw");
-const PID_FILE = join(HEARTBEAT_DIR, "daemon.pid");
-const STATE_FILE = join(HEARTBEAT_DIR, "state.json");
-const SETTINGS_FILE = join(HEARTBEAT_DIR, "settings.json");
-const JOBS_DIR = join(HEARTBEAT_DIR, "jobs");
+import { DATA_DIR, PID_FILE, STATE_FILE, SETTINGS_FILE, JOBS_DIR } from "../paths";
 
 function formatCountdown(ms: number): string {
   if (ms <= 0) return "now!";
@@ -24,27 +17,14 @@ function decodePath(encoded: string): string {
 }
 
 async function findAllDaemons(): Promise<{ path: string; pid: string }[]> {
-  const projectsDir = join(homedir(), ".claude", "projects");
   const results: { path: string; pid: string }[] = [];
 
-  let dirs: string[];
   try {
-    dirs = await readdir(projectsDir);
+    const pid = (await readFile(PID_FILE, "utf-8")).trim();
+    process.kill(Number(pid), 0);
+    results.push({ path: DATA_DIR, pid });
   } catch {
-    return results;
-  }
-
-  for (const dir of dirs) {
-    const candidatePath = decodePath(dir);
-    const pidFile = join(candidatePath, ".claude", "claudeclaw", "daemon.pid");
-
-    try {
-      const pid = (await readFile(pidFile, "utf-8")).trim();
-      process.kill(Number(pid), 0);
-      results.push({ path: candidatePath, pid });
-    } catch {
-      // no pid file or process dead
-    }
+    // no pid file or process dead
   }
 
   return results;

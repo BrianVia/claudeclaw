@@ -11,8 +11,9 @@ import { getDayAndMinuteAtOffset } from "../timezone";
 import { startWebUi, type WebServerHandle } from "../web";
 import type { Job } from "../jobs";
 
+import { DATA_DIR } from "../paths";
+
 const CLAUDE_DIR = join(process.cwd(), ".claude");
-const HEARTBEAT_DIR = join(CLAUDE_DIR, "claudeclaw");
 const STATUSLINE_FILE = join(CLAUDE_DIR, "statusline.cjs");
 const CLAUDE_SETTINGS_FILE = join(CLAUDE_DIR, "settings.json");
 const PREFLIGHT_SCRIPT = fileURLToPath(new URL("../preflight.ts", import.meta.url));
@@ -22,10 +23,11 @@ const PREFLIGHT_SCRIPT = fileURLToPath(new URL("../preflight.ts", import.meta.ur
 const STATUSLINE_SCRIPT = `#!/usr/bin/env node
 const { readFileSync } = require("fs");
 const { join } = require("path");
+const { homedir } = require("os");
 
-const DIR = join(__dirname, "claudeclaw");
-const STATE_FILE = join(DIR, "state.json");
-const PID_FILE = join(DIR, "daemon.pid");
+var DIR = process.env.CLAUDECLAW_HOME || join(homedir(), ".claudeclaw");
+var STATE_FILE = join(DIR, "state.json");
+var PID_FILE = join(DIR, "daemon.pid");
 
 const R = "\\x1b[0m";
 const DIM = "\\x1b[2m";

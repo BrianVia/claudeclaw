@@ -1,6 +1,5 @@
 import { join } from "path";
-
-const HEARTBEAT_DIR = join(process.cwd(), ".claude", "claudeclaw");
+import { DATA_DIR } from "./paths";
 
 // Write state.json so the statusline script can read fresh data
 export interface StateData {
@@ -16,7 +15,7 @@ export interface StateData {
 
 export async function writeState(state: StateData) {
   await Bun.write(
-    join(HEARTBEAT_DIR, "state.json"),
+    join(DATA_DIR, "state.json"),
     JSON.stringify(state) + "\n"
   );
 }
