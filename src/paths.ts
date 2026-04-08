@@ -27,3 +27,9 @@ export const INBOX_DIR = join(DATA_DIR, "inbox");
 
 /** Project-level prompt overrides (user-owned, outside the repo). */
 export const USER_PROMPTS_DIR = join(DATA_DIR, "prompts");
+
+/** Agent workspace — knowledge base, memory, docs, and tools. */
+export const WORKSPACE_DIR = join(DATA_DIR, "workspace");
+
+/** Transient file used to coordinate self-update across daemon restarts. */
+export const UPDATE_STATUS_FILE = join(DATA_DIR, "update-status.json");

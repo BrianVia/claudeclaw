@@ -12,7 +12,7 @@ import { getSettings, type ModelConfig, type SecurityConfig } from "./config";
 import { buildClockPromptPrefix } from "./timezone";
 import { selectModel } from "./model-router";
 
-import { LOGS_DIR, USER_PROMPTS_DIR } from "./paths";
+import { LOGS_DIR, USER_PROMPTS_DIR, WORKSPACE_DIR } from "./paths";
 
 // Resolve prompts relative to the claudeclaw installation, not the data dir
 const PROMPTS_DIR = join(import.meta.dir, "..", "prompts");
@@ -175,9 +175,11 @@ async function runClaudeOnce(
 const PROJECT_DIR = process.cwd();
 
 const DIR_SCOPE_PROMPT = [
-  `CRITICAL SECURITY CONSTRAINT: You are scoped to the project directory: ${PROJECT_DIR}`,
-  "You MUST NOT read, write, edit, or delete any file outside this directory.",
-  "You MUST NOT run bash commands that modify anything outside this directory (no cd /, no /etc, no ~/, no ../.. escapes).",
+  `CRITICAL SECURITY CONSTRAINT: You are scoped to these directories:`,
+  `- Project: ${PROJECT_DIR}`,
+  `- Workspace: ${WORKSPACE_DIR}`,
+  "You MUST NOT read, write, edit, or delete any file outside these directories.",
+  "You MUST NOT run bash commands that modify anything outside these directories.",
   "If a request requires accessing files outside the project, refuse and explain why.",
 ].join("\n");
 
@@ -258,7 +260,7 @@ function buildSecurityArgs(security: SecurityConfig): string[] {
  * User overrides in ~/.claudeclaw/prompts/ take precedence over repo defaults.
  */
 async function loadPrompts(): Promise<string> {
-  const promptNames = ["IDENTITY.md", "USER.md", "SOUL.md"];
+  const promptNames = ["IDENTITY.md", "USER.md", "SOUL.md", "TOOLS.md", "OPERATING-MANUAL.md", "OPERATING-CADENCE.md", "WORKSPACE.md"];
   const parts: string[] = [];
 
   for (const name of promptNames) {
