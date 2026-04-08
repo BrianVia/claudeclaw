@@ -12,6 +12,9 @@ import { INBOX_DIR, UPDATE_STATUS_FILE } from "../paths";
 const SLACK_API = "https://slack.com/api";
 const MAX_TEXT_LENGTH = 4000; // Slack's block text limit
 
+/** Threads the bot is active in — tracks by thread_ts so replies without @mention still get handled. */
+const activeThreads = new Set<string>();
+
 // --- Type interfaces ---
 
 interface SlackUser {
@@ -474,10 +477,11 @@ async function handleMessage(
   const isDm = "channel_type" in event && (event.channel_type === "im" || event.channel_type === "mpim");
   const isAppMention = event.type === "app_mention";
 
-  // In channels: only respond to mentions, listen channels, or thread replies we're in
+  // In channels: only respond to mentions, listen channels, or thread replies we're active in
   if (!isDm && !isAppMention) {
     const isListenChannel = config.listenChannels.includes(channelId);
-    if (!isListenChannel) return;
+    const isActiveThread = threadTs ? activeThreads.has(threadTs) : false;
+    if (!isListenChannel && !isActiveThread) return;
   }
 
   // Authorization check
@@ -587,6 +591,10 @@ async function handleMessage(
 
     const prefixedPrompt = promptParts.join("\n");
     const result = await runUserMessage("slack", prefixedPrompt);
+
+    // Track this thread so we respond to follow-ups without @mention
+    const threadKey = threadTs || ts;
+    activeThreads.add(threadKey);
 
     // Remove processing indicator, add completion indicator
     await removeReaction(token, channelId, ts, "eyes");
