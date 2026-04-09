@@ -198,6 +198,6 @@ export function startWebUi(opts: StartWebUiOptions): WebServerHandle {
   return {
     stop: () => server.stop(),
     host: opts.host,
-    port: server.port,
+    port: server.port ?? opts.port,
   };
 }

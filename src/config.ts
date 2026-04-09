@@ -350,7 +350,8 @@ export async function loadSettings(): Promise<Settings> {
   if (cached) return cached;
   const rawText = await Bun.file(SETTINGS_FILE).text();
   const raw = JSON.parse(rawText);
-  cached = parseSettings(raw, extractDiscordUserIds(rawText));
+  cached = parseSettings(raw);
+  cached.discord.allowedUserIds = extractDiscordUserIds(rawText);
   return cached;
 }
 
@@ -358,7 +359,8 @@ export async function loadSettings(): Promise<Settings> {
 export async function reloadSettings(): Promise<Settings> {
   const rawText = await Bun.file(SETTINGS_FILE).text();
   const raw = JSON.parse(rawText);
-  cached = parseSettings(raw, extractDiscordUserIds(rawText));
+  cached = parseSettings(raw);
+  cached.discord.allowedUserIds = extractDiscordUserIds(rawText);
   return cached;
 }
 
