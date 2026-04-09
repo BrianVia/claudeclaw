@@ -1,7 +1,7 @@
 import { readFile, writeFile, unlink, mkdir } from "fs/promises";
 import { join } from "path";
 import { fileURLToPath } from "url";
-import { run, runUserMessage, streamUserMessage, bootstrap, ensureProjectClaudeMd, loadHeartbeatPromptTemplate } from "../runner";
+import { run, runIsolated, runUserMessage, streamUserMessage, bootstrap, ensureProjectClaudeMd, loadHeartbeatPromptTemplate } from "../runner";
 import { writeState, type StateData } from "../statusline";
 import { cronMatches, nextCronMatch } from "../cron";
 import { clearJobSchedule, loadJobs } from "../jobs";
@@ -666,7 +666,7 @@ export async function start(args: string[] = []) {
             .filter((part) => part.length > 0)
             .join("\n\n");
           if (!mergedPrompt) return null;
-          return run("heartbeat", mergedPrompt);
+          return runIsolated("heartbeat", mergedPrompt);
         })
         .then((r) => {
           if (!r) return;
@@ -806,7 +806,7 @@ export async function start(args: string[] = []) {
     for (const job of currentJobs) {
       if (cronMatches(job.schedule, now, currentSettings.timezoneOffsetMinutes)) {
         resolvePrompt(job.prompt)
-          .then((prompt) => run(job.name, prompt))
+          .then((prompt) => runIsolated(job.name, prompt))
           .then((r) => {
             if (job.notify === false) return;
             if (job.notify === "error" && r.exitCode === 0) return;

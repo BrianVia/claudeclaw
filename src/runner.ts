@@ -58,6 +58,11 @@ export interface RunResult {
   exitCode: number;
 }
 
+interface RunOptions {
+  threadId?: string;
+  isolated?: boolean;
+}
+
 const RATE_LIMIT_PATTERN = /you.ve hit your limit|out of extra usage/i;
 
 // Serial queue — prevents concurrent --resume on the same session
@@ -66,7 +71,12 @@ let globalQueue: Promise<unknown> = Promise.resolve();
 // Per-thread queues — each thread runs independently in parallel
 const threadQueues = new Map<string, Promise<unknown>>();
 
-function enqueue<T>(fn: () => Promise<T>, threadId?: string): Promise<T> {
+function enqueue<T>(fn: () => Promise<T>, options: RunOptions = {}): Promise<T> {
+  if (options.isolated) {
+    return fn();
+  }
+
+  const { threadId } = options;
   if (threadId) {
     const current = threadQueues.get(threadId) ?? Promise.resolve();
     const task = current.then(fn, fn);
@@ -353,13 +363,16 @@ export async function compactCurrentSession(): Promise<{ success: boolean; messa
     : { success: false, message: `❌ Compact failed (${existing.sessionId.slice(0, 8)})` };
 }
 
-async function execClaude(name: string, prompt: string, threadId?: string): Promise<RunResult> {
+async function execClaude(name: string, prompt: string, options: RunOptions = {}): Promise<RunResult> {
   await mkdir(LOGS_DIR, { recursive: true });
 
-  const existing = threadId
+  const { threadId, isolated = false } = options;
+  const existing = isolated
+    ? null
+    : threadId
     ? await getThreadSession(threadId)
     : await getSession();
-  const isNew = !existing;
+  const isNew = isolated || !existing;
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   const logFile = join(LOGS_DIR, `${name}-${timestamp}.log`);
 
@@ -391,7 +404,9 @@ async function execClaude(name: string, prompt: string, threadId?: string): Prom
   const timeoutMs = (settings as any).sessionTimeoutMs || CLAUDE_TIMEOUT_MS;
 
   console.log(
-    `[${new Date().toLocaleTimeString()}] Running: ${name} (${isNew ? "new session" : `resume ${existing.sessionId.slice(0, 8)}`}, security: ${security.level})`
+    `[${new Date().toLocaleTimeString()}] Running: ${name} (${
+      isolated ? "isolated session" : isNew ? "new session" : `resume ${existing.sessionId.slice(0, 8)}`
+    }, security: ${security.level})`
   );
 
   // New session: use json output to capture Claude's session_id
@@ -461,7 +476,9 @@ async function execClaude(name: string, prompt: string, threadId?: string): Prom
       sessionId = json.session_id;
       stdout = json.result ?? "";
       // Save the real session ID from Claude Code
-      if (threadId) {
+      if (isolated) {
+        console.log(`[${new Date().toLocaleTimeString()}] Isolated session used: ${sessionId}`);
+      } else if (threadId) {
         await createThreadSession(threadId, sessionId);
         console.log(`[${new Date().toLocaleTimeString()}] Thread session created: ${sessionId} (thread ${threadId.slice(0, 8)})`);
       } else {
@@ -552,7 +569,11 @@ async function execClaude(name: string, prompt: string, threadId?: string): Prom
 }
 
 export async function run(name: string, prompt: string, threadId?: string): Promise<RunResult> {
-  return enqueue(() => execClaude(name, prompt, threadId), threadId);
+  return enqueue(() => execClaude(name, prompt, { threadId }), { threadId });
+}
+
+export async function runIsolated(name: string, prompt: string): Promise<RunResult> {
+  return enqueue(() => execClaude(name, prompt, { isolated: true }), { isolated: true });
 }
 
 async function streamClaude(
