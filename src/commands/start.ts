@@ -373,6 +373,10 @@ export async function start(args: string[] = []) {
   let heartbeatTimer: ReturnType<typeof setTimeout> | null = null;
   const daemonStartedAt = Date.now();
 
+  function resolveJobTimezoneOffsetMinutes(job: Job): number {
+    return job.scheduleTimezone === "utc" ? 0 : currentSettings.timezoneOffsetMinutes;
+  }
+
   // --- Telegram ---
   let telegramSend: ((chatId: number, text: string) => Promise<void>) | null = null;
   let telegramToken = "";
@@ -783,7 +787,7 @@ export async function start(args: string[] = []) {
         : undefined,
       jobs: currentJobs.map((job) => ({
         name: job.name,
-        nextAt: nextCronMatch(job.schedule, now, currentSettings.timezoneOffsetMinutes).getTime(),
+        nextAt: nextCronMatch(job.schedule, now, resolveJobTimezoneOffsetMinutes(job)).getTime(),
       })),
       security: currentSettings.security.level,
       telegram: !!currentSettings.telegram.token,
@@ -804,7 +808,7 @@ export async function start(args: string[] = []) {
   setInterval(() => {
     const now = new Date();
     for (const job of currentJobs) {
-      if (cronMatches(job.schedule, now, currentSettings.timezoneOffsetMinutes)) {
+      if (cronMatches(job.schedule, now, resolveJobTimezoneOffsetMinutes(job))) {
         resolvePrompt(job.prompt)
           .then((prompt) => runIsolated(job.name, prompt))
           .then((r) => {

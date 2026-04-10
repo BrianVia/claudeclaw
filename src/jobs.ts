@@ -8,7 +8,10 @@ export interface Job {
   prompt: string;
   recurring: boolean;
   notify: true | false | "error";
+  scheduleTimezone: "local" | "utc";
 }
+
+const warnedMissingScheduleTimezone = new Set<string>();
 
 function parseFrontmatterValue(raw: string): string {
   return raw.trim().replace(/^["']|["']$/g, "");
@@ -50,7 +53,25 @@ function parseJobFile(name: string, content: string): Job | null {
     : notifyRaw === "error" ? "error"
     : true;
 
-  return { name, schedule, prompt, recurring, notify };
+  const scheduleTimezoneLine = lines.find((l) => l.startsWith("scheduleTimezone:") || l.startsWith("timezone:"));
+  const scheduleTimezoneRaw = scheduleTimezoneLine
+    ? parseFrontmatterValue(
+        scheduleTimezoneLine.startsWith("scheduleTimezone:")
+          ? scheduleTimezoneLine.replace("scheduleTimezone:", "")
+          : scheduleTimezoneLine.replace("timezone:", ""),
+      ).toLowerCase()
+    : "";
+  const scheduleTimezone: "local" | "utc" = scheduleTimezoneRaw === "utc" ? "utc" : "local";
+
+  if (!scheduleTimezoneLine && !warnedMissingScheduleTimezone.has(name)) {
+    warnedMissingScheduleTimezone.add(name);
+    console.warn(
+      `[jobs] ${name}: no scheduleTimezone set; assuming local daemon timezone. ` +
+      `Add 'scheduleTimezone: local' or 'scheduleTimezone: utc' to make this explicit.`,
+    );
+  }
+
+  return { name, schedule, prompt, recurring, notify, scheduleTimezone };
 }
 
 export async function loadJobs(): Promise<Job[]> {
