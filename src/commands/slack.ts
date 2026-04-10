@@ -211,6 +211,10 @@ async function sendMessage(
   // Chunk long messages
   for (let i = 0; i < mrkdwn.length; i += MAX_TEXT_LENGTH) {
     const chunk = mrkdwn.slice(i, i + MAX_TEXT_LENGTH);
+    const preview = chunk.replace(/\s+/g, " ").trim();
+    console.log(
+      `[Slack] Sending message channel=${channelId}${threadTs ? ` thread=${threadTs}` : ""}: "${preview.slice(0, 120)}${preview.length > 120 ? "..." : ""}"`
+    );
     const body: Record<string, unknown> = {
       channel: channelId,
       text: chunk,
@@ -232,6 +236,27 @@ async function sendMessageToUser(
     { users: userId },
   );
   await sendMessage(token, result.channel.id, text);
+}
+
+export function stripSlackNarration(text: string): string {
+  let next = text.trim();
+
+  // The returned text is the Slack reply itself. Strip lead-in claims that a
+  // separate Slack post already happened, because they are misleading when no
+  // second post exists.
+  const leadingNarration = [
+    /^sent the full analysis to your slack thread\.\s*/i,
+    /^sent the breakdown to slack\.\s*/i,
+    /^slack message sent(?: to [^.]*)?\.\s*/i,
+    /^posted to #[a-z0-9_-]+\.\s*/i,
+    /^sent to #[a-z0-9_-]+\.\s*/i,
+  ];
+
+  for (const pattern of leadingNarration) {
+    next = next.replace(pattern, "");
+  }
+
+  return next.trim();
 }
 
 // --- Typing indicator ---
@@ -609,6 +634,7 @@ async function handleMessage(
       );
     } else {
       const { cleanedText, reactionEmoji } = extractReactionDirective(result.stdout || "");
+      const outboundText = stripSlackNarration(cleanedText || "(empty response)");
 
       if (reactionEmoji) {
         // Map common unicode emoji to Slack shortcodes
@@ -621,7 +647,7 @@ async function handleMessage(
       }
 
       // Reply in thread: use the original message ts as thread_ts
-      await sendMessage(token, channelId, cleanedText || "(empty response)", threadTs || ts);
+      await sendMessage(token, channelId, outboundText || "(empty response)", threadTs || ts);
     }
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
